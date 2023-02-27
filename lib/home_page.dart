@@ -12,8 +12,8 @@ class HomePage extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             ElevatedButton(
-              onPressed: () => Navigator.of(context).pushNamed(AlbumPage.routeName),
-              child: const Text("アルバム"),
+              onPressed: () => Navigator.of(context).pushNamed(CollectionPage.routeName),
+              child: const Text("ギャラリー"),
             ),
             ElevatedButton(
               onPressed: () => Navigator.of(context).pushNamed(CameraPage.routeName),
