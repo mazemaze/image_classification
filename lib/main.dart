@@ -24,7 +24,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       routes: {
-        AlbumPage.routeName: (ctx) => const AlbumPage(),
+        GalleryPage.routeName: (ctx) => const GalleryPage(),
         CameraPage.routeName: (ctx) => const CameraPage(),
         CollectionPage.routeName: (ctx) => const CollectionPage(),
       },
@@ -33,31 +33,39 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AlbumPage extends StatefulWidget {
-  const AlbumPage({super.key});
+class GalleryPage extends StatefulWidget {
+  const GalleryPage({super.key});
 
   static const routeName = 'gallery';
 
   @override
-  State<AlbumPage> createState() => _AlbumPageState();
+  State<GalleryPage> createState() => _GalleryPageState();
 }
 
-class _AlbumPageState extends State<AlbumPage> {
+class _GalleryPageState extends State<GalleryPage> {
   List<ImageData>? _data;
 
   @override
   void initState() {
-    insertData();
     super.initState();
   }
 
-  void insertData() async {
-    _data = await DBService().getAllImageData();
+  void insertData(int? id) async {
+    if (id == null) {
+      _data = await DBService().getAllImageData();
+      setState(() {});
+      return;
+    }
+    _data = await DBService().queryImageData(id);
     setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
+    final id = ModalRoute.of(context)?.settings.arguments as int?;
+    if (_data == null) {
+      insertData(id);
+    }
     return Scaffold(
       appBar: AppBar(
         title: const Text("ギャラリー"),
@@ -186,16 +194,10 @@ class _CollectionPageState extends State<CollectionPage> {
     _data = await DBService().getAllMetaData();
     final allThumbnail = await DBService().getImageData();
     temp.add(GestureDetector(
-      onTap: () => Navigator.of(context).push(
-        MaterialPageRoute(
-          builder: (builder) => PreviewPage(
-            imageFile: File(allThumbnail.path!),
-          ),
-        ),
-      ),
+      onTap: () => Navigator.of(context).pushNamed(GalleryPage.routeName),
       child: Column(
         children: [
-          Image.file(File("")),
+          Image.file(File(allThumbnail.path!)),
           const Text("全て"),
         ],
       ),
@@ -203,13 +205,7 @@ class _CollectionPageState extends State<CollectionPage> {
     _data!.map(
       (e) => temp.add(
         GestureDetector(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (builder) => PreviewPage(
-                imageFile: File(""),
-              ),
-            ),
-          ),
+          onTap: () => Navigator.of(context).pushNamed(GalleryPage.routeName, arguments: e.id),
           child: Column(
             children: [Image.file(File("")), Text(e.title ?? "")],
           ),
@@ -227,10 +223,14 @@ class _CollectionPageState extends State<CollectionPage> {
       insertData(context);
     }
     return Scaffold(
-        appBar: AppBar(
-          title: const Text("ギャラリー"),
-        ),
-        body: GridView.count(crossAxisCount: 3, children: _widgets ?? []));
+      appBar: AppBar(
+        title: const Text("ギャラリー"),
+      ),
+      body: GridView.count(
+        crossAxisCount: 3,
+        children: _widgets ?? [],
+      ),
+    );
   }
 }
 

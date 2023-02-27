@@ -49,7 +49,7 @@ class DBService {
     await db.delete(_imageTableName, where: 'id = ?', whereArgs: [data.id]);
   }
 
-  Future<List<ImageData>> queryImageData(String id) async {
+  Future<List<ImageData>> queryImageData(int id) async {
     List<ImageData> imageDataList = [];
     final Database db = await dbInit();
     List<Map<String, dynamic>> data = await db.query(_imageMetaTableName, where: 'metaId = ?', whereArgs: [id]);
