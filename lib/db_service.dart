@@ -16,22 +16,23 @@ class DBService {
       join(await getDatabasesPath(), _dbName),
       onCreate: (db, version) async {
         await db.execute(
-          'CREATE TABLE image(id INTEGER PRIMARY KEY, path TEXT, meta TEXT) ',
+          'CREATE TABLE image(id INTEGER PRIMARY KEY, path TEXT) ',
         );
         await db.execute(
-          'CREATE TABLE $_metaTableName(id INTEGER PRIMARY KEY, title TEXT)',
+          'CREATE TABLE $_metaTableName(id INTEGER PRIMARY KEY, title UNIQUE TEXT)',
         );
         await db.execute(
           'CREATE TABLE $_imageMetaTableName(id INTEGER PRIMARY KEY, imageId INTEGER, metaId)',
         );
       },
+      onUpgrade: (Database db, oldVersion, newVersion) async {},
       version: _curVersion,
     );
   }
 
-  Future<void> insertImageData(ImageData data) async {
+  Future<int> insertImageData(ImageData data) async {
     final Database db = await dbInit();
-    await db.insert(
+    return await db.insert(
       _imageTableName,
       data.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -49,11 +50,12 @@ class DBService {
     await db.delete(_imageTableName, where: 'id = ?', whereArgs: [data.id]);
   }
 
-  Future<List<ImageData>> queryImageData(int id) async {
+  Future<List<ImageData>> queryImageData(int metaId) async {
     List<ImageData> imageDataList = [];
     final Database db = await dbInit();
-    List<Map<String, dynamic>> data = await db.query(_imageMetaTableName, where: 'metaId = ?', whereArgs: [id]);
+    List<Map<String, dynamic>> data = await db.query(_imageMetaTableName, where: 'metaId = ?', whereArgs: [metaId]);
     final List<ImageMetaData> imageMetaList = data.map((e) => ImageMetaData.fromMap(e)).toList();
+    print(await db.query(_metaTableName));
     for (var imageMeta in imageMetaList) {
       data = await db.query(_imageTableName, where: 'id = ?', whereArgs: [imageMeta.imageId]);
       imageDataList.add(ImageData.fromMap(data.first));
@@ -73,18 +75,28 @@ class DBService {
     return maps.map((e) => MetaModel.fromMap(e)).toList();
   }
 
-  Future<void> insertMetaData(MetaModel data) async {
+  Future<int> insertMetaData(MetaModel data) async {
+    final id = DateTime.now().microsecondsSinceEpoch;
     final Database db = await dbInit();
-    await db.insert(
-      _metaTableName,
-      data.toMap(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
+    return await db.rawInsert(
+      "INSERT INTO $_metaTableName (id, title) VALUES(?, ?) ON CONFLICT(title) DO NOTHING",
+      [id, data.title],
     );
   }
 
-  Future<void> insertImageMetaData(ImageMetaData data) async {
+  Future<MetaModel?> queryMetaData(String title) async {
     final Database db = await dbInit();
-    await db.insert(
+    final List<Map<String, dynamic>> maps = await db.query(_metaTableName, where: "title = ?", whereArgs: [title]);
+    if (maps.isNotEmpty) {
+      return maps.map((e) => MetaModel.fromMap(e)).toList().first;
+    }
+    return null;
+  }
+
+  Future<int> insertImageMetaData(ImageMetaData data) async {
+    final Database db = await dbInit();
+    print(data);
+    return await db.insert(
       _imageMetaTableName,
       data.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
@@ -152,19 +164,16 @@ class ImageMetaData {
 class ImageData {
   final int? id;
   final String? path;
-  final String? meta;
 
   ImageData({
     this.id,
     this.path,
-    required this.meta,
   });
 
   Map<String, dynamic> toMap() {
     return <String, dynamic>{
       'id': id,
       'path': path,
-      'meta': meta,
     };
   }
 
@@ -172,7 +181,6 @@ class ImageData {
     return ImageData(
       id: map['id'] != null ? map['id'] as int : null,
       path: map['path'] != null ? map['path'] as String : null,
-      meta: map['meta'] as String,
     );
   }
 
@@ -188,22 +196,21 @@ class ImageData {
     return ImageData(
       id: id ?? this.id,
       path: path ?? this.path,
-      meta: meta ?? this.meta,
     );
   }
 
   @override
-  String toString() => 'ImageData(id: $id, path: $path, meta: $meta)';
+  String toString() => 'ImageData(id: $id, path: $path, meta: )';
 
   @override
   bool operator ==(covariant ImageData other) {
     if (identical(this, other)) return true;
 
-    return other.id == id && other.path == path && other.meta == meta;
+    return other.id == id && other.path == path;
   }
 
   @override
-  int get hashCode => id.hashCode ^ path.hashCode ^ meta.hashCode;
+  int get hashCode => id.hashCode ^ path.hashCode;
 }
 
 class MetaModel {

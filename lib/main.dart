@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mlkit_image_labeling/google_mlkit_image_labeling.dart';
 import 'package:image_classification/db_service.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
@@ -104,7 +105,11 @@ class _CameraPageState extends State<CameraPage> {
 
   @override
   void initState() {
-    controller = CameraController(_cameras[0], ResolutionPreset.max);
+    controller = CameraController(
+      _cameras[0],
+      ResolutionPreset.max,
+      imageFormatGroup: ImageFormatGroup.bgra8888,
+    );
     controller.initialize().then((_) {
       if (!mounted) {
         return;
@@ -149,7 +154,7 @@ class _CameraPageState extends State<CameraPage> {
           ),
           ElevatedButton(
             onPressed: () async {
-              await takePhoto();
+              final text = await takePhoto();
               if (takenPhoto != null) {
                 Navigator.push(
                   context,
@@ -191,27 +196,43 @@ class _CollectionPageState extends State<CollectionPage> {
 
   void insertData(BuildContext context) async {
     List<Widget> temp = [];
+    final db = DBService();
     _data = await DBService().getAllMetaData();
     final allThumbnail = await DBService().getImageData();
     temp.add(GestureDetector(
       onTap: () => Navigator.of(context).pushNamed(GalleryPage.routeName),
       child: Column(
         children: [
-          Image.file(File(allThumbnail.path!)),
-          const Text("全て"),
+          Expanded(
+            child: Image.file(
+              File(allThumbnail.path!),
+              fit: BoxFit.cover,
+            ),
+          ),
+          const Text("全ての画像")
         ],
       ),
     ));
-    _data!.map(
-      (e) => temp.add(
+    for (var e in _data!) {
+      final result = await db.queryImageData(e.id!);
+      temp.add(
         GestureDetector(
           onTap: () => Navigator.of(context).pushNamed(GalleryPage.routeName, arguments: e.id),
           child: Column(
-            children: [Image.file(File("")), Text(e.title ?? "")],
+            children: [
+              Expanded(
+                child: Image.file(
+                  File(result.first.path!),
+                  fit: BoxFit.cover,
+                ),
+              ),
+              Text(e.title ?? "")
+            ],
           ),
         ),
-      ),
-    );
+      );
+    }
+
     setState(() {
       _widgets = temp;
     });
@@ -235,10 +256,36 @@ class _CollectionPageState extends State<CollectionPage> {
 }
 
 class PreviewPage extends StatelessWidget {
-  const PreviewPage({super.key, required this.imageFile});
+  const PreviewPage({
+    super.key,
+    required this.imageFile,
+  });
+
   final File imageFile;
 
   static const routeName = 'preview';
+
+  Future processImage(String path, int id) async {
+    if (id == 0) {
+      return;
+    }
+    final InputImage imageFile = InputImage.fromFilePath(path);
+    final ImageLabelerOptions options = ImageLabelerOptions(confidenceThreshold: 0.7);
+    final ImageLabeler imageLabeler = ImageLabeler(options: options);
+    final List<ImageLabel> labels = await imageLabeler.processImage(imageFile);
+    for (ImageLabel label in labels) {
+      final meta = MetaModel(title: label.label);
+      await DBService().insertMetaData(meta);
+      final metaId = await DBService().queryMetaData(label.label);
+      if (metaId == null) {
+        continue;
+      }
+      final imageMeta = ImageMetaData(imageId: id, metaId: metaId.id);
+      print(imageMeta);
+      await DBService().insertImageMetaData(imageMeta);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -252,9 +299,9 @@ class PreviewPage extends StatelessWidget {
             onPressed: () async {
               final imageData = ImageData(
                 path: imageFile.path,
-                meta: "nothing",
               );
-              await DBService().insertImageData(imageData);
+              final insertedId = await DBService().insertImageData(imageData);
+              await processImage(imageFile.path, insertedId);
               Navigator.of(context)
                 ..pop()
                 ..pop();
