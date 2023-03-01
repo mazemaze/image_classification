@@ -1,16 +1,10 @@
 # image_classification
 
-A new Flutter project.
+Flutterを使った写真撮影x画像認識アプリ
 
-## Getting Started
+## 主な機能
+・写真撮影
+・画像認識（ラベリング：google_mlkit使用）
+・ラベリングに応じた画像のアルバム振り分け機能
 
-This project is a starting point for a Flutter application.
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
